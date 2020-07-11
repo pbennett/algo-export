@@ -1,3 +1,6 @@
+This code is for the solution on the Algorand Developer portal at https://developer.algorand.org/solutions/exporting-algorand-transactions-tax-reporting/. 
+The text of that solution is preserved here to start, but future changes may move this 'solution' text into a solution/ directory and a more convential readme replacing it.
+
 >"...in this world nothing can be said to be certain, except death and taxes."  
 >Benjamin Franklin
 
