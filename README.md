@@ -34,7 +34,7 @@ Koinly is an excellent choice as well.  There are pros/cons to all of these site
 
 # Requirements  
 
-* Basic working knoweldge of Go is recommended
+* A basic working knoweldge of Go is recommended
 * A working [Go](https://golang.org/) installation
   * The code for this program is all in Go, and uses the new Algorand-SDK V2 client [SDK](https://github.com/algorand/go-algorand-sdk) 
   * This is used to retrieve all transactions for each account.
@@ -45,7 +45,7 @@ Koinly is an excellent choice as well.  There are pros/cons to all of these site
     * You can sign up for a [free account](https://www.purestake.com/technology/algorand-api/).
   * Using a public API service like https://algoexplorer.io is an option, but it doesn't support the V2 indexer API yet.
  
-# Getting started
+# Overview
 
 This solution will walk through a simple command line program for exporting one or more Algorand accounts and their transaction histories to CSV files for consumption by tax reporting sites.
 
@@ -54,7 +54,87 @@ The program is simple but parsing out the transaction details aren't particularl
 !!! note
     To keep this solution simpler, Algorand Standard Assets will be left out will be left as a later exercise.
 
-# Account list definition
+# Example use
+
+Before walking through the code, a quick example of the programs use is in order.
+
+I picked a random account on mainnet as well as one of the accounts it sent to and exported both using the following command:
+```
+algo-export -o test -f koinly -a HFTA36U4OCTSMXRUH4ZX3OACJBTJCR56AIH3G345TRPUQJHJBEXKLMMO4E,AV5EPTMH2RZJ2V72PR2WC63EMAMQOPKI2EDN4TU2XFA2WTAJN4VKKLODVI
+Exporting accounts:
+HFTA36U4OCTSMXRUH4ZX3OACJBTJCR56AIH3G345TRPUQJHJBEXKLMMO4E starting at: 1
+  62 transactions
+AV5EPTMH2RZJ2V72PR2WC63EMAMQOPKI2EDN4TU2XFA2WTAJN4VKKLODVI starting at: 1
+  60 transactions
+``` 
+Looking in the local test/ directory it created, we see:
+
+```
+>ls -l test
+total 40
+-rw-r--r--+ 1 patrickb  staff   6478 Jul 14 20:13 koinly-AV5EPTMH2RZJ2V72PR2WC63EMAMQOPKI2EDN4TU2XFA2WTAJN4VKKLODVI-1-7858071.csv
+-rw-r--r--+ 1 patrickb  staff  10636 Jul 14 20:13 koinly-HFTA36U4OCTSMXRUH4ZX3OACJBTJCR56AIH3G345TRPUQJHJBEXKLMMO4E-1-7858070.csv
+```
+
+If we examine the first few lines of the second file we see the csv:
+```csv
+Date,Sent Amount,Sent Currency,Received Amount,Received Currency,Fee Amount,Fee Currency,Net Worth Amount,Net Worth Currency,Label,Description,TxHash
+2020-07-14 22:05:44 UTC,4957.108696,ALGO,,,,,,,,,5GDWCVNIDHIAWGMI323DAZ2HSWB7NK6UQRXRXPW6NSH5EEZNRWQA
+2020-07-14 22:05:43 UTC,,,0.371700,ALGO,,,,,staking,,reward-5GDWCVNIDHIAWGMI323DAZ2HSWB7NK6UQRXRXPW6NSH5EEZNRWQA
+2020-07-14 10:51:45 UTC,,,4956.733300,ALGO,,,,,,,U5JN2L65WXVAGXHWDHAZQPC4GDG2AGIB4HR5MAKBLAAIY52B55YQ
+2020-07-04 06:13:17 UTC,8652.734300,ALGO,,,,,,,,,4CJQ6AXIOLWLD2J5BQS6Z7QHUX2KO5E7F45OKJ3SBYG6CWESS7NQ
+2020-07-04 06:13:16 UTC,,,0.207648,ALGO,,,,,staking,,reward-4CJQ6AXIOLWLD2J5BQS6Z7QHUX2KO5E7F45OKJ3SBYG6CWESS7NQ
+```
+
+...and in table form:  
+
+|Date|Sent Amount|Sent Currency|Received Amount|Received Currency|Fee Amount|Fee Currency|Net Worth Amount|Net Worth Currency|Label|Description|TxHash|
+|---|---|---|---|---|---|---|---|---|---|---|---|  
+|2020-07-14 22:05:44 UTC|4957.108696|ALGO| | | | | | | | |5GDWCVNIDHIAWGMI323DAZ2HSWB7NK6UQRXRXPW6NSH5EEZNRWQA|
+|2020-07-14 22:05:43 UTC| | |0.371700|ALGO| | | | |staking| |reward-5GDWCVNIDHIAWGMI323DAZ2HSWB7NK6UQRXRXPW6NSH5EEZNRWQA|
+|2020-07-14 10:51:45 UTC| | |4956.733300|ALGO| | | | | | |U5JN2L65WXVAGXHWDHAZQPC4GDG2AGIB4HR5MAKBLAAIY52B55YQ|
+|2020-07-04 06:13:17 UTC|8652.734300|ALGO| | | | | | | | |4CJQ6AXIOLWLD2J5BQS6Z7QHUX2KO5E7F45OKJ3SBYG6CWESS7NQ|
+|2020-07-04 06:13:16 UTC| | |0.207648|ALGO| | | | |staking| |reward-4CJQ6AXIOLWLD2J5BQS6Z7QHUX2KO5E7F45OKJ3SBYG6CWESS7NQ|
+
+Notice we see sends, receives, and synthesized 'staking' *reward* transactions.  
+
+As a quick example, for Koinly (since that was what was chosen to export above), I created an account, clicked Wallets, then Add Wallet / Exchange.
+
+The screen will look like:
+![Add Wallet](https://algorand-devloper-portal-app.s3.amazonaws.com/static/EditorImages/2020/07/15%2001%3A07/Screen_Shot_2020-07-14_at_8.27.43_PM.png)
+
+Type something like csv in the search box and hit enter.  If it's not a known exchange, wallet, it'll assume it's a custom import.      
+Click the "Create custom wallet with name 'csv' link."  
+
+On the next screen, change the Wallet name to be something like Algo-XXXX where it's the first 4 or so characters of your account address.  
+Click Upload csv files, and then drag and drop the proper csv file or click Browse and load the file.
+
+Repeat the procedure for each of your accounts (when importing your own).
+
+For this example, I added the two wallets:
+
+![Wallets](https://algorand-devloper-portal-app.s3.amazonaws.com/static/EditorImages/2020/07/15%2001%3A08/Screen_Shot_2020-07-14_at_9.06.19_PM.png)
+
+Each time you re-run the algo-export program it will continue where it left off, exporting any new transactions that have occurred since it last ran.
+If there were no new transactons it won't create a file.  
+So whenever you have new transactions, re-run the program with the same arguments, and import the new files it created.
+
+These particular accounts sent to accounts which weren't imported so Koinly will assume they were sends, not transfers since it doesn't have a matching receive.
+
+A brief view of the transactions as Koinly shows them is seen below:  
+
+!!! note
+    Notice the staking rewards that were tagged.  Koinly shows them as a Staking reward.
+ 
+![Koinly Example](https://algorand-devloper-portal-app.s3.amazonaws.com/static/EditorImages/2020/07/15%2000%3A56/Screen_Shot_2020-07-14_at_8.32.33_PM.png) 
+
+Both Koinly and CoinTracker have a ton of features and I recommend you evaluate on your own.
+
+Now that we've shown the basics, let's get to the code. 
+ 
+# Code walkthrough
+
+## Account list definition
 
 If you look at the main.go code, you'll notice the definition of a simple type called accountList.
 This is merely to wrap a new type that will be set by a command-line flag using the built-in flag package in Go.
@@ -84,7 +164,7 @@ func (al *accountList) Set(value string) error {
 }
 ```
 
-# Flag initialization
+## Flag initialization
 
 Now we define the flags we want to accept.  
 They are
@@ -120,7 +200,7 @@ func main() {
 	}
 ```
 
-# Getting formatter implementation
+## Getting formatter implementation
 
 The formatter name is used to get an instance of an exporter for the specified format.  These exporters are defined
 in a exporter/ sub-package and are set up to 'register' themselves.  GetFormatter will return   
@@ -134,7 +214,7 @@ in a exporter/ sub-package and are set up to 'register' themselves.  GetFormatte
 	}
 ```
 
-# Connecting to an indexer node
+## Connecting to an indexer node
 
 To keep things a little cleaner and because we're supporting two different indexer API connections, I've moved getting
 a connection to an indexer instance into a separate helper function. 
@@ -184,7 +264,7 @@ func getClient(serverFlag string, apiKey string, usePureStake bool) (*indexer.Cl
 }
 ```
 
-# Fetching Account transactions
+## Fetching Account transactions
 
 After the retrieval of our client, we call another function, exportAccounts to export the list of accounts.
 We pass the client we just retrieved, the 'export' instance (which implements our exporter interface), and the list of accounts to export.
@@ -261,7 +341,7 @@ that through to the export implementation's WriteRecord method to write out the 
 }
 ```
 
-# Filtering Transactions
+## Filtering Transactions
 
 Skipping some of the setup code, let's walk through the FilterTransaction function in the exporter/ sub-package.
 
@@ -465,10 +545,10 @@ func (k *koinlyExporter) WriteRecord(writer io.Writer, record ExportRecord) {
 }
 ``` 
 
-# Building and using the program
+# Building the program
 
-This solution assumes you're a go developer, or at least somewhat familiar with it.
-Even if not, if you'd just like to use the program it's quite simple to build yourself.
+This solution assumed you're a go developer, or at least somewhat familiar with it.
+Even if not, if you'd just like to use the program it's simple to build yourself.
 
 First, download the go compiler from https://golang.org/
 
@@ -504,9 +584,6 @@ Usage of algo-export:
     	Index server to connect to (default "localhost:8980")
 ```
 
-Picking random accounts from testnet, an example run of the program might look like:
-```text
-algo-export -f koinly -o ~/algo-export -a SHTUSO6YCTH5NV74MU2HC4VOKFGX3NLOUVD5TCZCXQWDSX6JCE4SMZMOYA,RJPKBOTOQ5NSBKA47T5QO5EUZB5UT4PR4ZGSAIINH5KVAKPBT2W3WGG7YE
-```
+Refer back to [Example use](../../solutions/exporting-algorand-transactions-tax-reporting/#example-use) for examples of how the program is used.
 
-All that's left is taking the generated .csv files and importing them to Cointracker, or Koinly! 
+Enjoy!
