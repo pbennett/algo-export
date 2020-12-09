@@ -12,10 +12,14 @@ This solution provides a simple starting point for a tool to export on-chain Alg
 
 * [CoinTracker](https://www.cointracker.io/)
 * [Koinly](https://koinly.io/)
+* [TokenTax](https://tokentax.co/)
 
 CoinTracker has an excellent tax guide if you'd lke more details on the subject: https://www.cointracker.io/blog/crypto-tax-guide
 
 Koinly is an excellent choice as well. There are pros/cons to all of these sites and with varying fees & features. They're worth a look.
+
+TokenTax is another simple and easy to use option, but comes at a cost. The report generated from this tool tracks "Deposits", "Withdrawals" and "Staking" income. Combined with
+data one's other wallets/exchanges, TokenTax can show captial gains as well as income received from Algorand staking.
 
 [TOC]
 
