@@ -112,25 +112,34 @@ func exportAccounts(client *indexer.Client, export exporter.Interface, accounts 
 		startRound := state.ForAccount(export.Name(), account).LastRound + 1
 		fmt.Println(account, "starting at:", startRound)
 
-		lookupTx := client.LookupAccountTransactions(account)
-		lookupTx.MinRound(startRound)
-		transactions, err := lookupTx.Do(context.TODO())
-		if err != nil {
-			return fmt.Errorf("error looking up transactions: %w", err)
-		}
-		endRound := transactions.CurrentRound
-		state.ForAccount(export.Name(), account).LastRound = endRound
-
-		fmt.Printf("  %v transactions\n", len(transactions.Transactions))
-		if len(transactions.Transactions) == 0 {
-			continue
-		}
-		outCsv, err := os.Create(filepath.Join(outDir, fmt.Sprintf("%s-%s-%d-%d.csv", export.Name(), account, startRound, endRound)))
-		export.WriteHeader(outCsv)
-		for _, tx := range transactions.Transactions {
-			for _, record := range exporter.FilterTransaction(tx, account) {
-				export.WriteRecord(outCsv, record)
+		nextToken := ""
+		numPages := 1
+		for {
+			lookupTx := client.LookupAccountTransactions(account)
+			lookupTx.MinRound(startRound)
+			lookupTx.NextToken(nextToken)
+			transactions, err := lookupTx.Do(context.TODO())
+			if err != nil {
+				return fmt.Errorf("error looking up transactions: %w", err)
 			}
+			endRound := transactions.CurrentRound
+			state.ForAccount(export.Name(), account).LastRound = endRound
+
+			numTx := len(transactions.Transactions)
+			fmt.Printf("  %v transactions\n", numTx)
+			if numTx == 0 {
+				break
+			}
+			outCsv, err := os.Create(filepath.Join(outDir, fmt.Sprintf("%s-%s-%d-%d-%d.csv", export.Name(), account, startRound, endRound, numPages)))
+			export.WriteHeader(outCsv)
+			for _, tx := range transactions.Transactions {
+				for _, record := range exporter.FilterTransaction(tx, account) {
+					export.WriteRecord(outCsv, record)
+				}
+			}
+			fmt.Printf("  %v NextToken at Page %d\n", transactions.NextToken, numPages)
+			nextToken = transactions.NextToken
+			numPages++
 		}
 	}
 	state.SaveConfig()
