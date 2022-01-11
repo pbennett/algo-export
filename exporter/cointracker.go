@@ -3,6 +3,8 @@ package exporter
 import (
 	"fmt"
 	"io"
+
+	"github.com/algorand/go-algorand-sdk/client/v2/common/models"
 )
 
 func init() {
@@ -24,14 +26,13 @@ func (k *cointrackerExporter) WriteHeader(writer io.Writer) {
 	fmt.Fprintln(writer, "Date,Received Quantity,Received Currency,Sent Quantity,Sent Currency,Fee Amount,Fee Currency,Tag")
 }
 
-func (k *cointrackerExporter) WriteRecord(writer io.Writer, record ExportRecord) {
+func (k *cointrackerExporter) WriteRecord(writer io.Writer, record ExportRecord, assetMap map[uint64]models.Asset) {
 	//Date,Received Quantity,Received Currency,Sent Quantity,Sent Currency,Fee Amount,Fee Currency,Tag
 	fmt.Fprint(writer, record.blockTime.UTC().Format("01/02/2006 15:04:05,"))
 	
 	if record.assetID != 0 {
-		// Custom decimal formatting is needed for certain ASAs.
-		fmt.Fprintf(writer, "%s,ASA-%d,", algoFmt(record.recvQty),record.assetID)
-		fmt.Fprintf(writer, "%s,ASA-%d,", algoFmt(record.sentQty),record.assetID)
+		fmt.Fprintf(writer, "%s,ASA-%d,", assetIDFmt(record.recvQty, record.assetID, assetMap), record.assetID)
+		fmt.Fprintf(writer, "%s,ASA-%d,", assetIDFmt(record.sentQty, record.assetID, assetMap), record.assetID)
 	} else {
 		fmt.Fprintf(writer, "%s,ALGO,", algoFmt(record.recvQty))
 		fmt.Fprintf(writer, "%s,ALGO,", algoFmt(record.sentQty))
