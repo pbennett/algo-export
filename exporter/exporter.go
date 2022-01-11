@@ -123,15 +123,27 @@ func FilterTransaction(tx models.Transaction, account string, assetMap map[uint6
 				sendAmount = tx.PaymentTransaction.Amount
 				rewards += tx.SenderRewards
 			}
-			records = appendPostFilter(records, ExportRecord{
-				blockTime: blockTime,
-				txid:      tx.Id,
-				recvQty:   recvAmount,
-				receiver:  account,
-				sentQty:   sendAmount,
-				sender:    tx.Sender,
-				fee:       tx.Fee,
-			})
+			// Ignore transaction fee if we are only the receiver.
+			if tx.Sender != account && tx.PaymentTransaction.Receiver == account {
+				records = appendPostFilter(records, ExportRecord{
+					blockTime: blockTime,
+					txid:      tx.Id,
+					recvQty:   recvAmount,
+					receiver:  account,
+					sentQty:   sendAmount,
+					sender:    tx.Sender,
+				})
+			} else {
+				records = appendPostFilter(records, ExportRecord{
+					blockTime: blockTime,
+					txid:      tx.Id,
+					recvQty:   recvAmount,
+					receiver:  account,
+					sentQty:   sendAmount,
+					sender:    tx.Sender,
+					fee:       tx.Fee,
+				})
+			}
 		} else {
 			// only choice at this point are sending transactions
 			rewards = tx.SenderRewards
@@ -185,16 +197,29 @@ func FilterTransaction(tx models.Transaction, account string, assetMap map[uint6
 				sendAmount = tx.AssetTransferTransaction.Amount
 				rewards += tx.SenderRewards
 			}
-			records = appendPostFilter(records, ExportRecord{
-				blockTime: blockTime,
-				txid:      tx.Id,
-				recvQty:   recvAmount,
-				receiver:  account,
-				sentQty:   sendAmount,
-				sender:    tx.Sender,
-				fee:       tx.Fee,
-				assetID:   tx.AssetTransferTransaction.AssetId,
-			})
+			// Ignore transaction fee if we are only the receiver.
+			if tx.Sender != account && tx.PaymentTransaction.Receiver == account {
+				records = appendPostFilter(records, ExportRecord{
+					blockTime: blockTime,
+					txid:      tx.Id,
+					recvQty:   recvAmount,
+					receiver:  account,
+					sentQty:   sendAmount,
+					sender:    tx.Sender,
+					assetID:   tx.AssetTransferTransaction.AssetId,
+				})
+			} else {
+				records = appendPostFilter(records, ExportRecord{
+					blockTime: blockTime,
+					txid:      tx.Id,
+					recvQty:   recvAmount,
+					receiver:  account,
+					sentQty:   sendAmount,
+					sender:    tx.Sender,
+					fee:       tx.Fee,
+					assetID:   tx.AssetTransferTransaction.AssetId,
+				})
+			}
 		} else {
 			// only choice at this point are sending transactions
 			rewards = tx.SenderRewards
