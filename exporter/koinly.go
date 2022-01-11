@@ -27,17 +27,24 @@ func (k *koinlyExporter) WriteHeader(writer io.Writer) {
 func (k *koinlyExporter) WriteRecord(writer io.Writer, record ExportRecord) {
 	//Date,Sent Amount,Sent Currency,Received Amount,Received Currency,Fee Amount,Fee Currency,Net Worth Amount,Net Worth Currency,Label,Description,TxHash
 	fmt.Fprintf(writer, "%s UTC,", record.blockTime.UTC().Format("2006-01-02 15:04:05"))
-	if record.sentQty != 0 {
+	switch {
+	case record.sentQty != 0 && record.assetId != 0:
+		fmt.Fprintf(writer, "%s,ASA-%d,", algoFmt(record.sentQty),record.assetID)
+	case record.sentQty != 0:
 		fmt.Fprintf(writer, "%s,ALGO,", algoFmt(record.sentQty))
-	} else {
+	default:
 		fmt.Fprintf(writer, ",,")
 	}
-	if record.recvQty != 0 {
+
+	switch {
+	case record.recvQty != 0 && record.assetId != 0:
+		fmt.Fprintf(writer, "%s,ASA-%d,", algoFmt(record.recvQty),record.assetID)
+	case record.recvQty != 0:
 		fmt.Fprintf(writer, "%s,ALGO,", algoFmt(record.recvQty))
-	} else {
+	default:
 		fmt.Fprintf(writer, ",,")
 	}
-	if record.fee > 0 {
+	if record.fee != 0 {
 		fmt.Fprintf(writer, "%s,ALGO,", algoFmt(record.fee))
 	} else {
 		fmt.Fprintf(writer, ",,")
