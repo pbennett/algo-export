@@ -37,7 +37,11 @@ func (k *koinlyExporter) WriteRecord(writer io.Writer, record ExportRecord) {
 	} else {
 		fmt.Fprintf(writer, ",,")
 	}
-	fmt.Fprintf(writer, ",,")
+	if record.fee > 0 {
+		fmt.Fprintf(writer, "%s,ALGO,", algoFmt(record.fee))
+	} else {
+		fmt.Fprintf(writer, ",,")
+	}
 	var label string
 	if record.reward {
 		label = "staking"
