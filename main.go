@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/algorand/go-algorand-sdk/client/v2/common"
 	"github.com/algorand/go-algorand-sdk/client/v2/indexer"
@@ -140,6 +141,9 @@ func exportAccounts(client *indexer.Client, export exporter.Interface, accounts 
 			fmt.Printf("  %v NextToken at Page %d\n", transactions.NextToken, numPages)
 			nextToken = transactions.NextToken
 			numPages++
+
+			// Rate limited to <1 request per second.
+			time.Sleep(2 * time.Second)
 		}
 	}
 	state.SaveConfig()
