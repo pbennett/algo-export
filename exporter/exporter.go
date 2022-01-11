@@ -42,6 +42,7 @@ type ExportRecord struct {
 	receiver  string
 	sentQty   uint64
 	sender    string
+	fee       uint64
 	label     string
 	reward    bool // Is this a reward transaction - treat as income.
 }
@@ -102,7 +103,7 @@ func FilterTransaction(tx models.Transaction, account string) []ExportRecord {
 			}
 			// ...we could've sent to ourselves!
 			if tx.Sender == account {
-				sendAmount = tx.PaymentTransaction.Amount + tx.Fee
+				sendAmount = tx.PaymentTransaction.Amount
 				rewards += tx.SenderRewards
 			}
 			records = appendPostFilter(records, ExportRecord{
@@ -111,6 +112,7 @@ func FilterTransaction(tx models.Transaction, account string) []ExportRecord {
 				recvQty:   recvAmount,
 				receiver:  account,
 				sentQty:   sendAmount,
+				fee:       tx.Fee,
 				sender:    tx.Sender,
 			})
 		} else {
@@ -120,7 +122,7 @@ func FilterTransaction(tx models.Transaction, account string) []ExportRecord {
 			// handle case where we close-to an account and it's not same as receiver so treat as if two sends for export purposes
 			// so receives can be matched in different accounts if user has both
 			if tx.PaymentTransaction.CloseRemainderTo != "" && tx.PaymentTransaction.Receiver != tx.PaymentTransaction.CloseRemainderTo {
-				// Frist, add transaction for close-to... (without fee)
+				// First, add transaction for close-to... (without fee)
 				records = appendPostFilter(records, ExportRecord{
 					blockTime: blockTime,
 					txid:      tx.Id,
@@ -133,7 +135,8 @@ func FilterTransaction(tx models.Transaction, account string) []ExportRecord {
 					blockTime: blockTime.Add(1 * time.Second),
 					txid:      tx.Id,
 					receiver:  tx.PaymentTransaction.Receiver,
-					sentQty:   tx.PaymentTransaction.Amount + tx.Fee,
+					sentQty:   tx.PaymentTransaction.Amount,
+					fee:       tx.Fee,
 					sender:    account,
 				})
 			} else {
@@ -142,12 +145,13 @@ func FilterTransaction(tx models.Transaction, account string) []ExportRecord {
 					blockTime: blockTime,
 					txid:      tx.Id,
 					receiver:  tx.PaymentTransaction.Receiver,
-					sentQty:   tx.PaymentTransaction.Amount + tx.PaymentTransaction.CloseAmount + tx.ClosingAmount + tx.Fee,
+					sentQty:   tx.PaymentTransaction.Amount + tx.PaymentTransaction.CloseAmount + tx.ClosingAmount,
+					fee:       tx.Fee,
 					sender:    account,
 				})
 			}
 		}
-	case "keyreg", "acfg", "afrz", "axfer":
+	case "keyreg", "acfg", "afrz", "axfer", "appl":
 		// Just track the fees and rewards for now as a result of the transaction
 		// Ignore the ASA activity.
 		if tx.AssetTransferTransaction.Receiver == account {
@@ -157,7 +161,8 @@ func FilterTransaction(tx models.Transaction, account string) []ExportRecord {
 			records = appendPostFilter(records, ExportRecord{
 				blockTime: blockTime,
 				txid:      tx.Id,
-				sentQty:   tx.Fee,
+				sentQty:   0,
+				fee:       tx.Fee,
 				sender:    account,
 			})
 			rewards = tx.SenderRewards
