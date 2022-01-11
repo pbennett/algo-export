@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/algorand/go-algorand-sdk/client/v2/common"
+	"github.com/algorand/go-algorand-sdk/client/v2/common/models"
 	"github.com/algorand/go-algorand-sdk/client/v2/indexer"
 	"github.com/algorand/go-algorand-sdk/types"
 	"github.com/pbennett/algo-export/exporter"
@@ -104,6 +105,8 @@ func getClient(serverFlag string, apiKey string, usePureStake bool) (*indexer.Cl
 
 func exportAccounts(client *indexer.Client, export exporter.Interface, accounts accountList, outDir string) error {
 	state := LoadConfig()
+	assetMap := make(map[uint64]models.Asset)
+
 	fmt.Println("Exporting accounts:")
 	for _, accountAddress := range accounts {
 		// accountAddress contains the non-checksummed internal version - String() provides the
@@ -134,8 +137,21 @@ func exportAccounts(client *indexer.Client, export exporter.Interface, accounts 
 			outCsv, err := os.Create(filepath.Join(outDir, fmt.Sprintf("%s-%s-%d-%d-%d.csv", export.Name(), account, startRound, endRound, numPages)))
 			export.WriteHeader(outCsv)
 			for _, tx := range transactions.Transactions {
-				for _, record := range exporter.FilterTransaction(tx, account) {
-					export.WriteRecord(outCsv, record)
+				// Populate assetMap if entry does not exist.
+				if tx.AssetTransferTransaction.AssetId != 0 {
+			 		if _, ok := assetMap[tx.AssetTransferTransaction.AssetId]; !ok {
+			 			// Rate limited to <1 request per second.
+			 			time.Sleep(2 * time.Second)
+			 			lookupASA := client.LookupAssetByID(tx.AssetTransferTransaction.AssetId)
+			 			_, asset, err := lookupASA.Do(context.TODO())
+			 			if err != nil {
+			 				return fmt.Errorf("error looking up asset id: %w", err)
+			 			}
+			 			assetMap[tx.AssetTransferTransaction.AssetId] = asset
+					}
+				}
+				for _, record := range exporter.FilterTransaction(tx, account, assetMap) {
+					export.WriteRecord(outCsv, record, assetMap)
 				}
 			}
 			fmt.Printf("  %v NextToken at Page %d\n", transactions.NextToken, numPages)
