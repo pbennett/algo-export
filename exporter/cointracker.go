@@ -29,7 +29,13 @@ func (k *cointrackerExporter) WriteRecord(writer io.Writer, record ExportRecord)
 	fmt.Fprint(writer, record.blockTime.UTC().Format("01/02/2006 15:04:05,"))
 	fmt.Fprintf(writer, "%s,ALGO,", algoFmt(record.recvQty))
 	fmt.Fprintf(writer, "%s,ALGO,", algoFmt(record.sentQty))
-	fmt.Fprintf(writer, ",,")
+
+	if record.fee > 0 {
+		fmt.Fprintf(writer, "%s,ALGO,", algoFmt(record.fee))
+	} else {
+		fmt.Fprintf(writer, ",,")
+	}
+
 	// cointracker only supports tag field for specifying type - can't pass txid, descriptions, etc.
 	var tag string
 	if record.reward {
