@@ -50,8 +50,8 @@ type ExportRecord struct {
 // appendPostFilter is a simple post-processing filter that ignores records that are all 0
 // as well as adjusting s
 func appendPostFilter(records []ExportRecord, record ExportRecord) []ExportRecord {
-	if record.recvQty == 0 && record.sentQty == 0 {
-		// Nothing sent, nothing received... ignore !
+	if record.recvQty == 0 && record.sentQty == 0 && record.fee == 0 {
+		// Nothing sent, nothing received, nothing in fees... ignore !
 		return records
 	}
 	// The only time we have send and receive at same time is when sending to ourselves.
