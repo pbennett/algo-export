@@ -43,6 +43,7 @@ type ExportRecord struct {
 	sentQty   uint64
 	sender    string
 	fee       uint64
+  assetID   uint64
 	label     string
 	reward    bool // Is this a reward transaction - treat as income.
 }
@@ -112,8 +113,8 @@ func FilterTransaction(tx models.Transaction, account string) []ExportRecord {
 				recvQty:   recvAmount,
 				receiver:  account,
 				sentQty:   sendAmount,
-				fee:       tx.Fee,
 				sender:    tx.Sender,
+				fee:       tx.Fee,
 			})
 		} else {
 			// only choice at this point are sending transactions
@@ -136,8 +137,8 @@ func FilterTransaction(tx models.Transaction, account string) []ExportRecord {
 					txid:      tx.Id,
 					receiver:  tx.PaymentTransaction.Receiver,
 					sentQty:   tx.PaymentTransaction.Amount,
-					fee:       tx.Fee,
 					sender:    account,
+					fee:       tx.Fee,
 				})
 			} else {
 				// either a regular receive or a receive and close-remainder-to but to same account.
@@ -146,12 +147,78 @@ func FilterTransaction(tx models.Transaction, account string) []ExportRecord {
 					txid:      tx.Id,
 					receiver:  tx.PaymentTransaction.Receiver,
 					sentQty:   tx.PaymentTransaction.Amount + tx.PaymentTransaction.CloseAmount + tx.ClosingAmount,
-					fee:       tx.Fee,
 					sender:    account,
+					fee:       tx.Fee,
 				})
 			}
 		}
-	case "keyreg", "acfg", "afrz", "axfer", "appl":
+	case "axfer":
+		if tx.AssetTransferTransaction.Receiver == account || tx.AssetTransferTransaction.CloseTo == account {
+			// We could potentially be receiver, AND close-to account so check independently
+			// We could be sender as well - so handle appropriately.
+			if tx.AssetTransferTransaction.Receiver == account {
+				recvAmount += tx.AssetTransferTransaction.Amount
+				rewards += tx.ReceiverRewards
+			}
+			if tx.AssetTransferTransaction.CloseTo == account {
+				recvAmount += tx.AssetTransferTransaction.CloseAmount + tx.AssetTransferTransaction.CloseAmount
+				rewards += tx.CloseRewards
+			}
+			// ...we could've sent to ourselves!
+			if tx.Sender == account {
+				sendAmount = tx.AssetTransferTransaction.Amount
+				rewards += tx.SenderRewards
+			}
+			records = appendPostFilter(records, ExportRecord{
+				blockTime: blockTime,
+				txid:      tx.Id,
+				recvQty:   recvAmount,
+				receiver:  account,
+				sentQty:   sendAmount,
+				sender:    tx.Sender,
+				fee:       tx.Fee,
+				assetID:   tx.AssetTransferTransaction.AssetId,
+			})
+		} else {
+			// only choice at this point are sending transactions
+			rewards = tx.SenderRewards
+
+			// handle case where we close-to an account and it's not same as receiver so treat as if two sends for export purposes
+			// so receives can be matched in different accounts if user has both
+			if tx.AssetTransferTransaction.CloseTo != "" && tx.AssetTransferTransaction.Receiver != tx.AssetTransferTransaction.CloseTo {
+				// First, add transaction for close-to... (without fee)
+				records = appendPostFilter(records, ExportRecord{
+					blockTime: blockTime,
+					txid:      tx.Id,
+					receiver:  tx.AssetTransferTransaction.CloseTo,
+					sentQty:   tx.AssetTransferTransaction.CloseAmount + tx.AssetTransferTransaction.CloseAmount,
+					sender:    account,
+					assetID:   tx.AssetTransferTransaction.AssetId,
+				})
+				// then add an extra transaction 1-sec later to base receiver (with fee)
+				records = appendPostFilter(records, ExportRecord{
+					blockTime: blockTime.Add(1 * time.Second),
+					txid:      tx.Id,
+					receiver:  tx.AssetTransferTransaction.Receiver,
+					sentQty:   tx.AssetTransferTransaction.Amount,
+					sender:    account,
+					fee:       tx.Fee,
+					assetID:   tx.AssetTransferTransaction.AssetId,
+				})
+			} else {
+				// either a regular receive or a receive and close-remainder-to but to same account.
+				records = appendPostFilter(records, ExportRecord{
+					blockTime: blockTime,
+					txid:      tx.Id,
+					receiver:  tx.AssetTransferTransaction.Receiver,
+					sentQty:   tx.AssetTransferTransaction.Amount + tx.AssetTransferTransaction.CloseAmount,
+					sender:    account,
+					fee:       tx.Fee,
+					assetID:   tx.AssetTransferTransaction.AssetId,
+				})
+			}
+		}
+	case "keyreg", "acfg", "afrz", "appl":
 		// Just track the fees and rewards for now as a result of the transaction
 		// Ignore the ASA activity.
 		if tx.AssetTransferTransaction.Receiver == account {
