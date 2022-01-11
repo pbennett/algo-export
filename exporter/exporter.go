@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/algorand/go-algorand-sdk/client/v2/common/models"
 	"github.com/algorand/go-algorand-sdk/types"
+  
+	"github.com/shopspring/decimal"
 )
 
 type ExportFactory func() Interface
@@ -43,7 +46,7 @@ type ExportRecord struct {
 	sentQty   uint64
 	sender    string
 	fee       uint64
-  assetID   uint64
+	assetID   uint64
 	label     string
 	reward    bool // Is this a reward transaction - treat as income.
 }
@@ -68,11 +71,24 @@ func appendPostFilter(records []ExportRecord, record ExportRecord) []ExportRecor
 type Interface interface {
 	Name() string
 	WriteHeader(writer io.Writer)
-	WriteRecord(writer io.Writer, record ExportRecord)
+	WriteRecord(writer io.Writer, record ExportRecord, assetMap map[uint64]models.Asset)
 }
 
 func algoFmt(algos uint64) string {
 	return fmt.Sprintf("%.6f", types.MicroAlgos(algos).ToAlgos())
+}
+
+func assetIDFmt(amount, assetID uint64, assetMap map[uint64]models.Asset) string {
+	if val, ok := assetMap[assetID]; ok {
+		if val.Params.Decimals != 0 {
+			// models.Params.Decimals must be between 0 and 19 (inclusive).
+			tokens := decimal.RequireFromString(strconv.FormatUint(amount, 10))
+			return tokens.Shift(int32(val.Params.Decimals) * -1).String()
+		}
+		return strconv.FormatUint(amount, 10)
+	}
+	log.Fatalln("unknown decimal amount for AssetID:", assetID)
+	return strconv.FormatUint(amount, 10)
 }
 
 // Parse a transaction block, converting into simple send / receive equivalents.
@@ -80,7 +96,7 @@ func algoFmt(algos uint64) string {
 // Tracking apps seem to treat 'fees' a little differently and seem to assume they're specifically for trades.
 // Since this code is focused on on-chain send/receive activity, the fees are better expressed as 'total send' amount
 // send amount + tx fee, vs receive amount.  The tracking sites will then express that as a chain fee.
-func FilterTransaction(tx models.Transaction, account string) []ExportRecord {
+func FilterTransaction(tx models.Transaction, account string, assetMap map[uint64]models.Asset) []ExportRecord {
 	var (
 		blockTime  = time.Unix(int64(tx.RoundTime), 0).UTC()
 		recvAmount uint64
