@@ -55,8 +55,17 @@ func (k *koinlyExporter) WriteRecord(writer io.Writer, record ExportRecord, asse
 	var label string
 	if record.reward {
 		label = "staking"
-		record.txid = "reward-" + record.txid
+		if record.topTxID != "" {
+			record.topTxID = "reward-" + record.topTxID
+		} else {
+			record.txid = "reward-" + record.txid
+		}
 	}
 	fmt.Fprintf(writer, ",,")
-	fmt.Fprintf(writer, "%s,,%s\n", label, record.txid)
+	fmt.Fprintf(writer, "%s,,", label)
+	if record.topTxID != "" {
+		fmt.Fprintf(writer, "%s\n", record.topTxID)
+	} else {
+		fmt.Fprintf(writer, "%s\n", record.txid)
+	}
 }
