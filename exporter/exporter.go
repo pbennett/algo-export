@@ -272,7 +272,7 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 		}
 	case "keyreg", "acfg", "afrz", "appl":
 		// Just track the fees and rewards for now as a result of the transaction
-		// Ignore the ASA activity.
+		// Ignore the ASA activity that is not an asset transfer transaction.
 		if tx.AssetTransferTransaction.Receiver == account {
 			rewards += tx.ReceiverRewards
 		}
