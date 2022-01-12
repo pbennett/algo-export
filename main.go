@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/url"
 	"os"
@@ -103,6 +104,39 @@ func getClient(serverFlag string, apiKey string, usePureStake bool) (*indexer.Cl
 	return client, err
 }
 
+func exportTransactions(client *indexer.Client, export exporter.Interface, account string, outCsv io.Writer, assetMap map[uint64]models.Asset, txns []models.Transaction) error {
+	for _, tx := range txns {
+		// Recursive export of inner transactions.
+		if len(tx.InnerTxns) > 0 {
+			fmt.Printf("    processing %d inner transaction(s) for transaction id: %s\n", len(tx.InnerTxns), tx.Id)
+			if err := exportTransactions(client, export, account, outCsv, assetMap, tx.InnerTxns); err != nil {
+				return err
+			}
+		}
+
+		// Populate assetMap if entry does not exist.
+		if tx.AssetTransferTransaction.AssetId != 0 {
+			if _, ok := assetMap[tx.AssetTransferTransaction.AssetId]; !ok {
+				// Rate limited to <1 request per second.
+				time.Sleep(2 * time.Second)
+
+				fmt.Println("    looking up Asset ID:", tx.AssetTransferTransaction.AssetId)
+				lookupASA := client.LookupAssetByID(tx.AssetTransferTransaction.AssetId)
+				_, asset, err := lookupASA.Do(context.TODO())
+				if err != nil {
+					return fmt.Errorf("error looking up asset id: %w", err)
+				}
+				assetMap[tx.AssetTransferTransaction.AssetId] = asset
+			}
+		}
+		for _, record := range exporter.FilterTransaction(tx, account, assetMap) {
+			export.WriteRecord(outCsv, record, assetMap)
+		}
+	}
+	return nil
+}
+
+
 func exportAccounts(client *indexer.Client, export exporter.Interface, accounts accountList, outDir string) error {
 	state := LoadConfig()
 	assetMap := make(map[uint64]models.Asset)
@@ -136,23 +170,8 @@ func exportAccounts(client *indexer.Client, export exporter.Interface, accounts 
 			}
 			outCsv, err := os.Create(filepath.Join(outDir, fmt.Sprintf("%s-%s-%d-%d-%d.csv", export.Name(), account, startRound, endRound, numPages)))
 			export.WriteHeader(outCsv)
-			for _, tx := range transactions.Transactions {
-				// Populate assetMap if entry does not exist.
-				if tx.AssetTransferTransaction.AssetId != 0 {
-			 		if _, ok := assetMap[tx.AssetTransferTransaction.AssetId]; !ok {
-			 			// Rate limited to <1 request per second.
-			 			time.Sleep(2 * time.Second)
-			 			lookupASA := client.LookupAssetByID(tx.AssetTransferTransaction.AssetId)
-			 			_, asset, err := lookupASA.Do(context.TODO())
-			 			if err != nil {
-			 				return fmt.Errorf("error looking up asset id: %w", err)
-			 			}
-			 			assetMap[tx.AssetTransferTransaction.AssetId] = asset
-					}
-				}
-				for _, record := range exporter.FilterTransaction(tx, account, assetMap) {
-					export.WriteRecord(outCsv, record, assetMap)
-				}
+			if err := exportTransactions(client, export, account, outCsv, assetMap, transactions.Transactions); err != nil {
+				return err
 			}
 			fmt.Printf("  %v NextToken at Page %d\n", transactions.NextToken, numPages)
 			nextToken = transactions.NextToken
