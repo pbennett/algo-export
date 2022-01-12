@@ -9,7 +9,7 @@ import (
 
 	"github.com/algorand/go-algorand-sdk/client/v2/common/models"
 	"github.com/algorand/go-algorand-sdk/types"
-  
+
 	"github.com/shopspring/decimal"
 )
 
@@ -40,6 +40,7 @@ func GetFormatter(format string) Interface {
 // Sends to separate accounts in a single transaction
 type ExportRecord struct {
 	blockTime time.Time
+	topTxID   string
 	txid      string
 	recvQty   uint64
 	receiver  string
@@ -96,7 +97,7 @@ func assetIDFmt(amount, assetID uint64, assetMap map[uint64]models.Asset) string
 // Tracking apps seem to treat 'fees' a little differently and seem to assume they're specifically for trades.
 // Since this code is focused on on-chain send/receive activity, the fees are better expressed as 'total send' amount
 // send amount + tx fee, vs receive amount.  The tracking sites will then express that as a chain fee.
-func FilterTransaction(tx models.Transaction, account string, assetMap map[uint64]models.Asset) []ExportRecord {
+func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap map[uint64]models.Asset) []ExportRecord {
 	var (
 		blockTime  = time.Unix(int64(tx.RoundTime), 0).UTC()
 		recvAmount uint64
@@ -127,6 +128,7 @@ func FilterTransaction(tx models.Transaction, account string, assetMap map[uint6
 			if tx.Sender != account && tx.PaymentTransaction.Receiver == account {
 				records = appendPostFilter(records, ExportRecord{
 					blockTime: blockTime,
+					topTxID:   topTxID,
 					txid:      tx.Id,
 					recvQty:   recvAmount,
 					receiver:  account,
@@ -136,6 +138,7 @@ func FilterTransaction(tx models.Transaction, account string, assetMap map[uint6
 			} else {
 				records = appendPostFilter(records, ExportRecord{
 					blockTime: blockTime,
+					topTxID:   topTxID,
 					txid:      tx.Id,
 					recvQty:   recvAmount,
 					receiver:  account,
@@ -154,6 +157,7 @@ func FilterTransaction(tx models.Transaction, account string, assetMap map[uint6
 				// First, add transaction for close-to... (without fee)
 				records = appendPostFilter(records, ExportRecord{
 					blockTime: blockTime,
+					topTxID:   topTxID,
 					txid:      tx.Id,
 					receiver:  tx.PaymentTransaction.CloseRemainderTo,
 					sentQty:   tx.PaymentTransaction.CloseAmount + tx.ClosingAmount,
@@ -162,6 +166,7 @@ func FilterTransaction(tx models.Transaction, account string, assetMap map[uint6
 				// then add an extra transaction 1-sec later to base receiver (with fee)
 				records = appendPostFilter(records, ExportRecord{
 					blockTime: blockTime.Add(1 * time.Second),
+					topTxID:   topTxID,
 					txid:      tx.Id,
 					receiver:  tx.PaymentTransaction.Receiver,
 					sentQty:   tx.PaymentTransaction.Amount,
@@ -172,6 +177,7 @@ func FilterTransaction(tx models.Transaction, account string, assetMap map[uint6
 				// either a regular receive or a receive and close-remainder-to but to same account.
 				records = appendPostFilter(records, ExportRecord{
 					blockTime: blockTime,
+					topTxID:   topTxID,
 					txid:      tx.Id,
 					receiver:  tx.PaymentTransaction.Receiver,
 					sentQty:   tx.PaymentTransaction.Amount + tx.PaymentTransaction.CloseAmount + tx.ClosingAmount,
@@ -201,6 +207,7 @@ func FilterTransaction(tx models.Transaction, account string, assetMap map[uint6
 			if tx.Sender != account && tx.PaymentTransaction.Receiver == account {
 				records = appendPostFilter(records, ExportRecord{
 					blockTime: blockTime,
+					topTxID:   topTxID,
 					txid:      tx.Id,
 					recvQty:   recvAmount,
 					receiver:  account,
@@ -211,6 +218,7 @@ func FilterTransaction(tx models.Transaction, account string, assetMap map[uint6
 			} else {
 				records = appendPostFilter(records, ExportRecord{
 					blockTime: blockTime,
+					topTxID:   topTxID,
 					txid:      tx.Id,
 					recvQty:   recvAmount,
 					receiver:  account,
@@ -230,6 +238,7 @@ func FilterTransaction(tx models.Transaction, account string, assetMap map[uint6
 				// First, add transaction for close-to... (without fee)
 				records = appendPostFilter(records, ExportRecord{
 					blockTime: blockTime,
+					topTxID:   topTxID,
 					txid:      tx.Id,
 					receiver:  tx.AssetTransferTransaction.CloseTo,
 					sentQty:   tx.AssetTransferTransaction.CloseAmount + tx.AssetTransferTransaction.CloseAmount,
@@ -239,6 +248,7 @@ func FilterTransaction(tx models.Transaction, account string, assetMap map[uint6
 				// then add an extra transaction 1-sec later to base receiver (with fee)
 				records = appendPostFilter(records, ExportRecord{
 					blockTime: blockTime.Add(1 * time.Second),
+					topTxID:   topTxID,
 					txid:      tx.Id,
 					receiver:  tx.AssetTransferTransaction.Receiver,
 					sentQty:   tx.AssetTransferTransaction.Amount,
@@ -250,6 +260,7 @@ func FilterTransaction(tx models.Transaction, account string, assetMap map[uint6
 				// either a regular receive or a receive and close-remainder-to but to same account.
 				records = appendPostFilter(records, ExportRecord{
 					blockTime: blockTime,
+					topTxID:   topTxID,
 					txid:      tx.Id,
 					receiver:  tx.AssetTransferTransaction.Receiver,
 					sentQty:   tx.AssetTransferTransaction.Amount + tx.AssetTransferTransaction.CloseAmount,
@@ -268,6 +279,7 @@ func FilterTransaction(tx models.Transaction, account string, assetMap map[uint6
 		if tx.Sender == account {
 			records = appendPostFilter(records, ExportRecord{
 				blockTime: blockTime,
+				topTxID:   topTxID,
 				txid:      tx.Id,
 				sentQty:   0,
 				fee:       tx.Fee,
@@ -288,6 +300,7 @@ func FilterTransaction(tx models.Transaction, account string, assetMap map[uint6
 		// Apply rewards 'first' (earlier timestamp)
 		records = appendPostFilter(records, ExportRecord{
 			blockTime: blockTime.Add(-1 * time.Second),
+			topTxID:   topTxID,
 			txid:      tx.Id,
 			reward:    true,
 			recvQty:   rewards,
