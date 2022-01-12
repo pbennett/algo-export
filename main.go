@@ -104,12 +104,19 @@ func getClient(serverFlag string, apiKey string, usePureStake bool) (*indexer.Cl
 	return client, err
 }
 
-func exportTransactions(client *indexer.Client, export exporter.Interface, account string, outCsv io.Writer, assetMap map[uint64]models.Asset, txns []models.Transaction) error {
-	for _, tx := range txns {
+func exportTransactions(client *indexer.Client, export exporter.Interface, account string, outCsv io.Writer, assetMap map[uint64]models.Asset, txns []models.Transaction, topTxID string) error {
+	for index, tx := range txns {
+		if topTxID != "" {
+			topTxID = fmt.Sprintf("%d-%s", index, topTxID)  // Keep an unique id each inner transaction.
+		}
 		// Recursive export of inner transactions.
 		if len(tx.InnerTxns) > 0 {
+			var uniqueTxID string
+			if topTxID == "" {
+				uniqueTxID = "inner-" + tx.Id  // Initialize to top level transaction id.
+			}
 			fmt.Printf("    processing %d inner transaction(s) for transaction id: %s\n", len(tx.InnerTxns), tx.Id)
-			if err := exportTransactions(client, export, account, outCsv, assetMap, tx.InnerTxns); err != nil {
+			if err := exportTransactions(client, export, account, outCsv, assetMap, tx.InnerTxns, uniqueTxID); err != nil {
 				return err
 			}
 		}
@@ -129,7 +136,7 @@ func exportTransactions(client *indexer.Client, export exporter.Interface, accou
 				assetMap[tx.AssetTransferTransaction.AssetId] = asset
 			}
 		}
-		for _, record := range exporter.FilterTransaction(tx, account, assetMap) {
+		for _, record := range exporter.FilterTransaction(tx, topTxID, account, assetMap) {
 			export.WriteRecord(outCsv, record, assetMap)
 		}
 	}
@@ -170,7 +177,7 @@ func exportAccounts(client *indexer.Client, export exporter.Interface, accounts 
 			}
 			outCsv, err := os.Create(filepath.Join(outDir, fmt.Sprintf("%s-%s-%d-%d-%d.csv", export.Name(), account, startRound, endRound, numPages)))
 			export.WriteHeader(outCsv)
-			if err := exportTransactions(client, export, account, outCsv, assetMap, transactions.Transactions); err != nil {
+			if err := exportTransactions(client, export, account, outCsv, assetMap, transactions.Transactions, ""); err != nil {
 				return err
 			}
 			fmt.Printf("  %v NextToken at Page %d\n", transactions.NextToken, numPages)
