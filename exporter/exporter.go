@@ -121,7 +121,7 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 			}
 			// ...we could've sent to ourselves!
 			if tx.Sender == account {
-				sendAmount = tx.PaymentTransaction.Amount
+				sendAmount = tx.PaymentTransaction.Amount + tx.Fee
 				rewards += tx.SenderRewards
 			}
 			// Ignore transaction fee if we are only the receiver.
@@ -169,7 +169,7 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 					topTxID:   topTxID,
 					txid:      tx.Id,
 					receiver:  tx.PaymentTransaction.Receiver,
-					sentQty:   tx.PaymentTransaction.Amount,
+					sentQty:   tx.PaymentTransaction.Amount + tx.Fee,
 					sender:    account,
 					fee:       tx.Fee,
 				})
@@ -180,7 +180,7 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 					topTxID:   topTxID,
 					txid:      tx.Id,
 					receiver:  tx.PaymentTransaction.Receiver,
-					sentQty:   tx.PaymentTransaction.Amount + tx.PaymentTransaction.CloseAmount + tx.ClosingAmount,
+					sentQty:   tx.PaymentTransaction.Amount + tx.PaymentTransaction.CloseAmount + tx.ClosingAmount + tx.Fee,
 					sender:    account,
 					fee:       tx.Fee,
 				})
@@ -281,7 +281,7 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 				blockTime: blockTime,
 				topTxID:   topTxID,
 				txid:      tx.Id,
-				sentQty:   0,
+				sentQty:   tx.Fee,
 				fee:       tx.Fee,
 				sender:    account,
 			})
