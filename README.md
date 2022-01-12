@@ -34,12 +34,9 @@ Koinly is an excellent choice as well. There are pros/cons to all of these sites
 
 # Overview
 
-This solution will walk through a simple command-line program for exporting one or more Algorand accounts and their transaction histories to CSV files for consumption by tax reporting sites.
+This solution will walk through a simple command-line program for exporting one or more Algorand accounts and their transaction histories (including Algorand Standard Assets) to CSV files for consumption by tax reporting sites.
 
 The program is simple but parsing out the transaction details aren't particularly obvious.
-
-!!! note
-To keep this solution simple, Algorand Standard Assets will be left out for a later exercise.
 
 # Example use
 
