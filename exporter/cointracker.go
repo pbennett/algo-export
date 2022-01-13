@@ -31,11 +31,22 @@ func (k *cointrackerExporter) WriteRecord(writer io.Writer, record ExportRecord,
 	fmt.Fprint(writer, record.blockTime.UTC().Format("01/02/2006 15:04:05,"))
 	
 	if record.assetID != 0 {
-		fmt.Fprintf(writer, "%s,ASA-%d,", assetIDFmt(record.recvQty, record.assetID, assetMap), record.assetID)
-		fmt.Fprintf(writer, "%s,ASA-%d,", assetIDFmt(record.sentQty, record.assetID, assetMap), record.assetID)
+		// https://www.cointracker.io/currencies/custom
+		fmt.Fprintf(writer, "%s,%s,", assetIDFmt(record.recvQty, record.assetID, assetMap), asaFmt(record.assetID, assetMap))
+		fmt.Fprintf(writer, "%s,%s,", assetIDFmt(record.sentQty, record.assetID, assetMap), asaFmt(record.assetID, assetMap))
 	} else {
-		fmt.Fprintf(writer, "%s,ALGO,", algoFmt(record.recvQty))
-		fmt.Fprintf(writer, "%s,ALGO,", algoFmt(record.sentQty))
+		switch {
+		case record.recvQty == 0:
+			fmt.Fprintf(writer, ",,")
+		default:
+			fmt.Fprintf(writer, "%s,ALGO,", algoFmt(record.recvQty))
+		}
+		switch {
+		case record.sentQty == 0:
+			fmt.Fprintf(writer, ",,")
+		default:
+			fmt.Fprintf(writer, "%s,ALGO,", algoFmt(record.sentQty))
+		}
 	}
 
 	if record.fee != 0 {
