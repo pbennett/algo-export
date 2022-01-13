@@ -127,12 +127,12 @@ func exportTransactions(client *indexer.Client, export exporter.Interface, accou
 				// Rate limited to <1 request per second.
 				time.Sleep(2 * time.Second)
 
-				fmt.Println("    looking up Asset ID:", tx.AssetTransferTransaction.AssetId)
 				lookupASA := client.LookupAssetByID(tx.AssetTransferTransaction.AssetId)
 				_, asset, err := lookupASA.Do(context.TODO())
 				if err != nil {
 					return fmt.Errorf("error looking up asset id: %w", err)
 				}
+				fmt.Printf("    looked up | Asset ID: %d | UnitName: %s | Decimals: %d |\n", asset.Index, asset.Params.UnitName, asset.Params.Decimals)
 				assetMap[tx.AssetTransferTransaction.AssetId] = asset
 			}
 		}
