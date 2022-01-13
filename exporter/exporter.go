@@ -93,7 +93,7 @@ func assetIDFmt(amount, assetID uint64, assetMap map[uint64]models.Asset) string
 		if val.Params.Decimals != 0 {
 			// models.Params.Decimals must be between 0 and 19 (inclusive).
 			tokens := decimal.RequireFromString(strconv.FormatUint(amount, 10))
-			return tokens.Shift(int32(val.Params.Decimals) * -1).String()
+			return tokens.Shift(int32(val.Params.Decimals) * -1).StringFixed(int32(val.Params.Decimals))
 		}
 		return strconv.FormatUint(amount, 10)
 	}
