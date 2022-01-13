@@ -31,7 +31,7 @@ func (k *koinlyExporter) WriteRecord(writer io.Writer, record ExportRecord, asse
 	fmt.Fprintf(writer, "%s UTC,", record.blockTime.UTC().Format("2006-01-02 15:04:05"))
 	switch {
 	case record.sentQty != 0 && record.assetID != 0:
-		fmt.Fprintf(writer, "%s,ASA-%d,", assetIDFmt(record.sentQty, record.assetID, assetMap),record.assetID)
+		fmt.Fprintf(writer, "%s,%s,", assetIDFmt(record.sentQty, record.assetID, assetMap), asaFmt(record.assetID, assetMap))
 	case record.sentQty != 0:
 		fmt.Fprintf(writer, "%s,ALGO,", algoFmt(record.sentQty))
 	default:
@@ -40,7 +40,7 @@ func (k *koinlyExporter) WriteRecord(writer io.Writer, record ExportRecord, asse
 
 	switch {
 	case record.recvQty != 0 && record.assetID != 0:
-		fmt.Fprintf(writer, "%s,ASA-%d,", assetIDFmt(record.recvQty, record.assetID, assetMap),record.assetID)
+		fmt.Fprintf(writer, "%s,%s,", assetIDFmt(record.recvQty, record.assetID, assetMap), asaFmt(record.assetID, assetMap))
 	case record.recvQty != 0:
 		fmt.Fprintf(writer, "%s,ALGO,", algoFmt(record.recvQty))
 	default:
