@@ -17,6 +17,15 @@ type ExportFactory func() Interface
 
 var formats = map[string]ExportFactory{}
 
+// Verified ASA that export well to tax tracker websites.
+var verifiedASA = map[uint64]struct{}{
+	163650: struct{}{},     // ARCC
+	226701642: struct{}{},  // YLDY
+	27165954: struct{}{},   // PLANETS
+	283820866: struct{}{},  // XET
+	287867876: struct{}{},  // OPUL
+}
+
 func registerFormat(format string, factory ExportFactory) {
 	formats[format] = factory
 }
@@ -90,6 +99,18 @@ func assetIDFmt(amount, assetID uint64, assetMap map[uint64]models.Asset) string
 	}
 	log.Fatalln("unknown decimal amount for AssetID:", assetID)
 	return strconv.FormatUint(amount, 10)
+}
+
+func asaFmt(assetID uint64, assetMap map[uint64]models.Asset) string {
+	val, ok := assetMap[assetID]
+	if !ok {
+		log.Fatalln("unknown unit name for AssetID:", assetID)
+		return ""
+	}
+	if _, ok := verifiedASA[assetID]; ok {
+		return val.Params.UnitName
+	}
+	return fmt.Sprintf("ASA-%d", assetID)
 }
 
 // Parse a transaction block, converting into simple send / receive equivalents.
@@ -203,31 +224,16 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 				sendAmount = tx.AssetTransferTransaction.Amount
 				rewards += tx.SenderRewards
 			}
-			// Ignore transaction fee if we are only the receiver.
-			if tx.Sender != account && tx.PaymentTransaction.Receiver == account {
-				records = appendPostFilter(records, ExportRecord{
-					blockTime: blockTime,
-					topTxID:   topTxID,
-					txid:      tx.Id,
-					recvQty:   recvAmount,
-					receiver:  account,
-					sentQty:   sendAmount,
-					sender:    tx.Sender,
-					assetID:   tx.AssetTransferTransaction.AssetId,
-				})
-			} else {
-				records = appendPostFilter(records, ExportRecord{
-					blockTime: blockTime,
-					topTxID:   topTxID,
-					txid:      tx.Id,
-					recvQty:   recvAmount,
-					receiver:  account,
-					sentQty:   sendAmount,
-					sender:    tx.Sender,
-					fee:       tx.Fee,
-					assetID:   tx.AssetTransferTransaction.AssetId,
-				})
-			}
+			records = appendPostFilter(records, ExportRecord{
+				blockTime: blockTime,
+				topTxID:   topTxID,
+				txid:      tx.Id,
+				recvQty:   recvAmount,
+				receiver:  account,
+				sentQty:   sendAmount,
+				sender:    tx.Sender,
+				assetID:   tx.AssetTransferTransaction.AssetId,
+			})
 		} else {
 			// only choice at this point are sending transactions
 			rewards = tx.SenderRewards
@@ -245,7 +251,7 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 					sender:    account,
 					assetID:   tx.AssetTransferTransaction.AssetId,
 				})
-				// then add an extra transaction 1-sec later to base receiver (with fee)
+				// then add an extra transaction 1-sec later to base receiver.
 				records = appendPostFilter(records, ExportRecord{
 					blockTime: blockTime.Add(1 * time.Second),
 					topTxID:   topTxID,
@@ -253,7 +259,6 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 					receiver:  tx.AssetTransferTransaction.Receiver,
 					sentQty:   tx.AssetTransferTransaction.Amount,
 					sender:    account,
-					fee:       tx.Fee,
 					assetID:   tx.AssetTransferTransaction.AssetId,
 				})
 			} else {
@@ -265,10 +270,20 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 					receiver:  tx.AssetTransferTransaction.Receiver,
 					sentQty:   tx.AssetTransferTransaction.Amount + tx.AssetTransferTransaction.CloseAmount,
 					sender:    account,
-					fee:       tx.Fee,
 					assetID:   tx.AssetTransferTransaction.AssetId,
 				})
 			}
+		}
+		// Split out fees into separate record because fee currency is different than ASA currency.
+		if tx.Sender == account {
+			records = appendPostFilter(records, ExportRecord{
+				blockTime: blockTime,
+				topTxID:   "fee-" + topTxID,
+				txid:      tx.Id,
+				sentQty:   tx.Fee,
+				fee:       tx.Fee,
+				sender:    account,
+			})
 		}
 	case "keyreg", "acfg", "afrz", "appl":
 		// Just track the fees and rewards for now as a result of the transaction
