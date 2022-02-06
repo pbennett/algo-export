@@ -59,6 +59,9 @@ type ExportRecord struct {
 	assetID   uint64
 	label     string
 	reward    bool // Is this a reward transaction - treat as income.
+	feeTx     bool // Is this a fee transaction.
+	txRaw     models.Transaction
+	account   string
 }
 
 // appendPostFilter is a simple post-processing filter that ignores records that are all 0
@@ -89,6 +92,9 @@ func algoFmt(algos uint64) string {
 }
 
 func assetIDFmt(amount, assetID uint64, assetMap map[uint64]models.Asset) string {
+	if assetID == 0 {
+		return algoFmt(amount)
+	}
 	if val, ok := assetMap[assetID]; ok {
 		if val.Params.Decimals != 0 {
 			// models.Params.Decimals must be between 0 and 19 (inclusive).
@@ -102,6 +108,9 @@ func assetIDFmt(amount, assetID uint64, assetMap map[uint64]models.Asset) string
 }
 
 func asaFmt(assetID uint64, assetMap map[uint64]models.Asset) string {
+	if assetID == 0 {
+		return "ALGO"
+	}
 	val, ok := assetMap[assetID]
 	if !ok {
 		log.Fatalln("unknown unit name for AssetID:", assetID)
@@ -110,7 +119,22 @@ func asaFmt(assetID uint64, assetMap map[uint64]models.Asset) string {
 	if _, ok := verifiedASA[assetID]; ok {
 		return val.Params.UnitName
 	}
-	return fmt.Sprintf("ASA-%d", assetID)
+	return fmt.Sprintf("%x", assetID % 4294967295)  // Limit to 8 characters.
+}
+
+func asaComment(assetID uint64, assetMap map[uint64]models.Asset) string {
+	if assetID == 0 {
+		return ""
+	}
+  if _, ok := verifiedASA[assetID]; ok {
+		return ""
+	}
+	val, ok := assetMap[assetID]
+	if !ok {
+		log.Fatalln("unknown unit name for AssetID:", assetID)
+		return ""
+	}
+  return fmt.Sprintf("ASA-%d | %s | %s", assetID, val.Params.UnitName, val.Params.Name)
 }
 
 // Parse a transaction block, converting into simple send / receive equivalents.
@@ -155,6 +179,8 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 					receiver:  account,
 					sentQty:   sendAmount,
 					sender:    tx.Sender,
+					txRaw:     tx,
+					account:   account,
 				})
 			} else {
 				records = appendPostFilter(records, ExportRecord{
@@ -166,6 +192,8 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 					sentQty:   sendAmount,
 					sender:    tx.Sender,
 					fee:       tx.Fee,
+					txRaw:     tx,
+					account:   account,
 				})
 			}
 		} else {
@@ -183,6 +211,8 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 					receiver:  tx.PaymentTransaction.CloseRemainderTo,
 					sentQty:   tx.PaymentTransaction.CloseAmount + tx.ClosingAmount,
 					sender:    account,
+					txRaw:     tx,
+					account:   account,
 				})
 				// then add an extra transaction 1-sec later to base receiver (with fee)
 				records = appendPostFilter(records, ExportRecord{
@@ -193,6 +223,8 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 					sentQty:   tx.PaymentTransaction.Amount + tx.Fee,
 					sender:    account,
 					fee:       tx.Fee,
+					txRaw:     tx,
+					account:   account,
 				})
 			} else {
 				// either a regular receive or a receive and close-remainder-to but to same account.
@@ -204,6 +236,8 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 					sentQty:   tx.PaymentTransaction.Amount + tx.PaymentTransaction.CloseAmount + tx.ClosingAmount + tx.Fee,
 					sender:    account,
 					fee:       tx.Fee,
+					txRaw:     tx,
+					account:   account,
 				})
 			}
 		}
@@ -233,6 +267,8 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 				sentQty:   sendAmount,
 				sender:    tx.Sender,
 				assetID:   tx.AssetTransferTransaction.AssetId,
+				txRaw:     tx,
+				account:   account,
 			})
 		} else {
 			// only choice at this point are sending transactions
@@ -250,6 +286,8 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 					sentQty:   tx.AssetTransferTransaction.CloseAmount + tx.AssetTransferTransaction.CloseAmount,
 					sender:    account,
 					assetID:   tx.AssetTransferTransaction.AssetId,
+					txRaw:     tx,
+					account:   account,
 				})
 				// then add an extra transaction 1-sec later to base receiver.
 				records = appendPostFilter(records, ExportRecord{
@@ -260,6 +298,8 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 					sentQty:   tx.AssetTransferTransaction.Amount,
 					sender:    account,
 					assetID:   tx.AssetTransferTransaction.AssetId,
+					txRaw:     tx,
+					account:   account,
 				})
 			} else {
 				// either a regular receive or a receive and close-remainder-to but to same account.
@@ -271,6 +311,8 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 					sentQty:   tx.AssetTransferTransaction.Amount + tx.AssetTransferTransaction.CloseAmount,
 					sender:    account,
 					assetID:   tx.AssetTransferTransaction.AssetId,
+					txRaw:     tx,
+					account:   account,
 				})
 			}
 		}
@@ -278,11 +320,14 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 		if tx.Sender == account {
 			records = appendPostFilter(records, ExportRecord{
 				blockTime: blockTime,
-				topTxID:   "fee-" + topTxID,
+				topTxID:   topTxID,
 				txid:      tx.Id,
 				sentQty:   tx.Fee,
 				fee:       tx.Fee,
 				sender:    account,
+				feeTx:     true,
+				txRaw:     tx,
+				account:   account,
 			})
 		}
 	case "keyreg", "acfg", "afrz", "appl":
@@ -299,6 +344,9 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 				sentQty:   tx.Fee,
 				fee:       tx.Fee,
 				sender:    account,
+				feeTx:     true,
+				txRaw:     tx,
+				account:   account,
 			})
 			rewards = tx.SenderRewards
 		}
@@ -320,6 +368,8 @@ func FilterTransaction(tx models.Transaction, topTxID, account string, assetMap 
 			reward:    true,
 			recvQty:   rewards,
 			receiver:  account,
+			txRaw:     tx,
+			account:   account,
 		})
 	}
 	return records
