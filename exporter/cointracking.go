@@ -28,12 +28,11 @@ func (k *cointrackingExporter) WriteHeader(writer io.Writer) {
 	// "Type", "Buy Amount", "Buy Currency", "Sell Amount", "Sell Currency", "Fee", "Fee Currency", "Exchange", "Trade-Group", "Comment", "Date"
 	// Optionally you can add those 3 columns at the end (after the "Date" column):
 	// "Tx-ID", "Buy Value in your Account Currency", "Sell Value in your Account Currency"
-	fmt.Fprint(writer, "Type,Buy Amount,Buy Currency,Sell Amount,Sell Currency,Fee,Fee Currency,Exchange,Trade-Group,Comment,Date,Tx-ID")
+	fmt.Fprintln(writer, "Type,Buy Amount,Buy Currency,Sell Amount,Sell Currency,Fee,Fee Currency,Exchange,Trade-Group,Comment,Date,Tx-ID")
 }
 
 func (k *cointrackingExporter) WriteRecord(writer io.Writer, record ExportRecord, assetMap map[uint64]models.Asset) {
 	// Type,Buy Amount,Buy Currency,Sell Amount,Sell Currency,Fee,Fee Currency,Exchange,Trade-Group,Comment,Date,Tx-ID
-	fmt.Fprintf(writer, "\n")
 
 	// Type,
 	// https://cointracking.freshdesk.com/en/support/solutions/articles/29000034379-expanded-transaction-types-may-2020-
