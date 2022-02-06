@@ -132,7 +132,7 @@ func exportTransactions(client *indexer.Client, export exporter.Interface, accou
 				if err != nil {
 					return fmt.Errorf("error looking up asset id: %w", err)
 				}
-				fmt.Printf("    looked up | Asset ID: %d | UnitName: %s | Decimals: %d |\n", asset.Index, asset.Params.UnitName, asset.Params.Decimals)
+				fmt.Printf("    looked up | Asset ID: %d | UnitName: %s | Name: %s | Decimals: %d |\n", asset.Index, asset.Params.UnitName, asset.Params.Name, asset.Params.Decimals)
 				assetMap[tx.AssetTransferTransaction.AssetId] = asset
 			}
 		}
@@ -157,6 +157,8 @@ func exportAccounts(client *indexer.Client, export exporter.Interface, accounts 
 		startRound := state.ForAccount(export.Name(), account).LastRound + 1
 		fmt.Println(account, "starting at:", startRound)
 
+		var outCsv *os.File
+
 		nextToken := ""
 		numPages := 1
 		for {
@@ -168,15 +170,20 @@ func exportAccounts(client *indexer.Client, export exporter.Interface, accounts 
 				return fmt.Errorf("error looking up transactions: %w", err)
 			}
 			endRound := transactions.CurrentRound
-			state.ForAccount(export.Name(), account).LastRound = endRound
+			if numPages == 1 {
+				state.ForAccount(export.Name(), account).LastRound = endRound
+				outCsv, err = os.Create(filepath.Join(outDir, fmt.Sprintf("%s-%s-%d-%d.csv", export.Name(), account, startRound, endRound)))
+				if err != nil {
+					return fmt.Errorf("unable to create file: %w", err)
+				}
+				export.WriteHeader(outCsv)
+			}
 
 			numTx := len(transactions.Transactions)
 			fmt.Printf("  %v transactions\n", numTx)
 			if numTx == 0 {
 				break
 			}
-			outCsv, err := os.Create(filepath.Join(outDir, fmt.Sprintf("%s-%s-%d-%d-%d.csv", export.Name(), account, startRound, endRound, numPages)))
-			export.WriteHeader(outCsv)
 			if err := exportTransactions(client, export, account, outCsv, assetMap, transactions.Transactions, ""); err != nil {
 				return err
 			}
