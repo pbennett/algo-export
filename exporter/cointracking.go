@@ -98,4 +98,6 @@ func (k *cointrackingExporter) WriteRecord(writer io.Writer, record ExportRecord
 	case record.feeTx:
 		fmt.Fprintf(writer, "_fee")
 	}
+	
+	fmt.Fprint(writer, "\n")
 }
