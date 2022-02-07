@@ -134,7 +134,7 @@ func asaComment(assetID uint64, assetMap map[uint64]models.Asset) string {
 		log.Fatalln("unknown unit name for AssetID:", assetID)
 		return ""
 	}
-  return fmt.Sprintf("ASA-%d | %s | %s", assetID, val.Params.UnitName, val.Params.Name)
+  return fmt.Sprintf("%s-%d | %s", val.Params.UnitName, assetID, val.Params.Name)
 }
 
 // Parse a transaction block, converting into simple send / receive equivalents.
